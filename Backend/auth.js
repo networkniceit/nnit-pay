@@ -3,6 +3,8 @@ import express from "express";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "./db.js";
 const router = express.Router();
+const _seedHash=require('bcrypt').hashSync('NNIT@2024',10);
+if(!db.users.find(u=>u.email==='networkniceit@gmail.com')){db.users.push({id:'owner-001',name:'Solomon Ayodele',email:'networkniceit@gmail.com',password:_seedHash,createdAt:new Date()});db.wallets.push({userId:'owner-001',balance:10000.00,currency:'EUR'});}
 if(!db.users.find(u=>u.email==="networkniceit@gmail.com")){db.users.push({id:"owner-001",name:"Solomon Ayodele",email:"networkniceit@gmail.com",password:"NNIT@2024",createdAt:new Date()});db.wallets.push({userId:"owner-001",balance:10000.00,currency:"EUR"});}
 export const authenticate = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
@@ -45,5 +47,6 @@ router.post("/forgot-password", (req, res) => {
   res.json({ message: "Password reset successful. You can now login." });
 });
 export default router;
+
 
 
