@@ -287,7 +287,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
 </div>
 
 <script>
-const API='http://localhost:5002';
+const API='https://nnit-pay-production.up.railway.app';
 let token=localStorage.getItem('nnit_token');
 let me=null,stripe=null,cardElement=null;
 const flags={USD:'🇺🇸',EUR:'🇪🇺',GBP:'🇬🇧',NGN:'🇳🇬',GHS:'🇬🇭',KES:'🇰🇪',ZAR:'🇿🇦',CAD:'🇨🇦',AUD:'🇦🇺',JPY:'🇯🇵',INR:'🇮🇳',MXN:'🇲🇽'};
@@ -486,4 +486,5 @@ function doLogout(){
 </script>
 </body>
 </html>
+
 
