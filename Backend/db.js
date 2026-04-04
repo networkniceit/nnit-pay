@@ -18,3 +18,4 @@ export const db = {
     MXN: 17.2
   }
 };
+

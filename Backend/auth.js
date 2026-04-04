@@ -34,4 +34,14 @@ router.get("/me", authenticate, (req, res) => {
   if (!user) return res.status(404).json({ error: "User not found" });
   res.json({ id: user.id, name: user.name, email: user.email });
 });
+router.post("/forgot-password", (req, res) => {
+  const { email, newPassword } = req.body;
+  if (!email || !newPassword) return res.status(400).json({ error: "Email and new password required" });
+  if (newPassword.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
+  const user = db.users.find(u => u.email === email);
+  if (!user) return res.status(404).json({ error: "No account found with that email" });
+  user.password = newPassword;
+  res.json({ message: "Password reset successful. You can now login." });
+});
 export default router;
+

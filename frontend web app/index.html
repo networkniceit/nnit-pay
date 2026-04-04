@@ -123,9 +123,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-
       <div class="fg"><label>Email</label><input type="email" id="loginEmail" placeholder="you@email.com"></div>
       <div class="fg"><label>Password</label><input type="password" id="loginPw" placeholder="••••••••"></div>
       <button class="btn primary full" onclick="doLogin()">Sign In</button>
-      <div class="auth-switch">No account? <a onclick="toggleAuth(true)">Register free</a></div>
+      <div class="auth-switch">No account? <a onclick="toggleAuth(true)">Register free</a></div><div class="auth-switch"><a onclick="toggleAuth(false,true)">Forgot password?</a></div>
     </div>
-    <div id="regForm" class="hidden">
+    <div id="forgotForm" class="hidden">
+<div class="auth-title">Reset Password</div>
+<div class="auth-sub">Enter your email and a new password</div>
+<div class="alert err" id="forgotErr"></div>
+<div class="alert ok" id="forgotOk"></div>
+<div class="fg"><label>Email</label><input type="email" id="forgotEmail" placeholder="you@email.com"></div>
+<div class="fg"><label>New Password</label><input type="password" id="forgotPw" placeholder="Min 6 characters"></div>
+<button class="btn primary full" onclick="doForgot()">Reset Password</button>
+<div class="auth-switch">Remember it? <a onclick="toggleAuth(false)">Sign in</a></div>
+</div>
+<div id="regForm" class="hidden">
       <div class="auth-title">Create account</div>
       <div class="auth-sub">Join NNIT Pay — send money globally</div>
       <div class="alert err" id="regErr"></div>
@@ -303,7 +313,12 @@ function toast(id,msg,type='err'){
   el.textContent=msg;el.className=`alert ${type} show`;
   setTimeout(()=>{el.className=`alert ${type}`;},6000);
 }
-function toggleAuth(reg){
+function toggleAuth(reg,forgot){
+  document.getElementById("loginForm").classList.toggle("hidden",reg||forgot);
+  document.getElementById("regForm").classList.toggle("hidden",!reg||forgot);
+  document.getElementById("forgotForm").classList.toggle("hidden",!forgot);
+}
+function toggleAuth_orig(reg){
   document.getElementById('loginForm').classList.toggle('hidden',reg);
   document.getElementById('regForm').classList.toggle('hidden',!reg);
 }
@@ -316,6 +331,17 @@ async function doLogin(){
     if(d.error)return toast('loginErr',d.error);
     token=d.token;localStorage.setItem('nnit_token',token);localStorage.setItem('nnit_last_email',email);localStorage.setItem('nnit_last_name',d.user.name);me=d.user;launch();
   }catch{toast('loginErr','Cannot connect — is backend running on port 5002?');}
+}
+async function doForgot(){
+  const email=document.getElementById("forgotEmail").value.trim();
+  const pw=document.getElementById("forgotPw").value;
+  if(!email||!pw) return toast("forgotErr","Email and new password required");
+  try{
+    const d=await apiFetch("/auth/forgot-password",{method:"POST",body:JSON.stringify({email,newPassword:pw})});
+    if(d.error) return toast("forgotErr",d.error);
+    toast("forgotOk",d.message,"ok");
+    setTimeout(()=>toggleAuth(false),2000);
+  }catch{toast("forgotErr","Cannot connect");}
 }
 async function doRegister(){
   const name=document.getElementById('regName').value.trim();
@@ -486,5 +512,8 @@ function doLogout(){
 </script>
 </body>
 </html>
+
+
+
 
 
