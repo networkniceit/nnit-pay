@@ -1,6 +1,8 @@
-import express from "express";
+﻿import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 import authRoutes from "./auth.js";
 import walletRoutes from "./wallet.js";
 import transferRoutes from "./transfer.js";
@@ -10,6 +12,8 @@ import paymentRoutes from "./payment.js";
 dotenv.config();
 
 const app = express();
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 app.use(cors());
 app.use(express.json());
 
@@ -19,16 +23,7 @@ app.use("/transfer", transferRoutes);
 app.use("/transactions", transactionRoutes);
 app.use("/payment", paymentRoutes);
 
-app.get("/", (req, res) => res.json({
-  name: "NNIT Pay API", version: "3.0.0", status: "running",
-  endpoints: {
-    auth: ["POST /auth/register", "POST /auth/login", "GET /auth/me"],
-    wallet: ["GET /wallet", "GET /wallet/rates", "POST /wallet/topup"],
-    transfer: ["POST /transfer", "POST /transfer/quote"],
-    transactions: ["GET /transactions", "GET /transactions/:id"],
-    payment: ["GET /payment/config", "POST /payment/create-intent", "POST /payment/confirm", "POST /payment/bank-transfer"]
-  }
-}));
+app.get("/", (req, res) => res.sendFile(join(__dirname, "index.html")));
 
 app.use((req, res) => res.status(404).json({ error: "Route not found" }));
 app.use((err, req, res, next) => { console.error(err.stack); res.status(500).json({ error: "Internal server error" }); });
@@ -39,5 +34,3 @@ app.listen(PORT, () => {
   console.log(`💳 Stripe: ${process.env.STRIPE_SECRET_KEY ? "connected" : "MISSING KEY"}`);
   console.log(`📋 API info: http://localhost:${PORT}/\n`);
 });
-
-
