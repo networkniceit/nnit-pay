@@ -13,24 +13,31 @@ const convert = (amount, from, to) => {
   return parseFloat((inUSD * rates[to]).toFixed(2));
 };
 
-// Notifies the NNIT VPN backend when a transfer lands in the VPN
-// business account, so it can activate the matching subscription plan.
-// Fire-and-forget — a webhook failure should never break the transfer
-// itself, so this is wrapped and only logged on error.
 async function notifyVpnWebhook(tx) {
+  console.log('[webhook-debug] notifyVpnWebhook called for tx:', tx.id);
+
   const webhookUrl = process.env.VPN_WEBHOOK_URL;
   const webhookSecret = process.env.NNIT_PAY_WEBHOOK_SECRET;
   const vpnBusinessEmail = process.env.VPN_BUSINESS_EMAIL;
 
+  console.log('[webhook-debug] webhookUrl:', webhookUrl);
+  console.log('[webhook-debug] webhookSecret present:', !!webhookSecret);
+  console.log('[webhook-debug] vpnBusinessEmail:', JSON.stringify(vpnBusinessEmail));
+  console.log('[webhook-debug] tx.receiverEmail:', JSON.stringify(tx.receiverEmail));
+
   if (!webhookUrl || !webhookSecret || !vpnBusinessEmail) {
-    return; // Not configured — silently skip, this is optional
+    console.log('[webhook-debug] SKIPPED: missing env config');
+    return;
   }
   if (tx.receiverEmail !== vpnBusinessEmail) {
-    return; // Not a VPN payment — nothing to do
+    console.log('[webhook-debug] SKIPPED: receiverEmail does not match vpnBusinessEmail');
+    return;
   }
 
+  console.log('[webhook-debug] Sending webhook request now...');
+
   try {
-    await fetch(webhookUrl, {
+    const response = await fetch(webhookUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -42,8 +49,11 @@ async function notifyVpnWebhook(tx) {
         transactionId: tx.id,
       }),
     });
+    const responseText = await response.text();
+    console.log('[webhook-debug] Response status:', response.status);
+    console.log('[webhook-debug] Response body:', responseText);
   } catch (err) {
-    console.error("Failed to notify VPN webhook:", err.message);
+    console.error('[webhook-debug] Fetch threw an error:', err.message);
   }
 }
 
@@ -98,7 +108,7 @@ router.post("/", authenticate, async (req, res) => {
 
     db.transactions.push(tx);
 
-    // Fire the webhook after the transfer succeeds — doesn't block the response
+    console.log('[webhook-debug] About to call notifyVpnWebhook...');
     notifyVpnWebhook(tx);
 
     res.json({ message: "Transfer successful", transaction: tx });
