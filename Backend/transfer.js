@@ -13,8 +13,42 @@ const convert = (amount, from, to) => {
   return parseFloat((inUSD * rates[to]).toFixed(2));
 };
 
+// Notifies the NNIT VPN backend when a transfer lands in the VPN
+// business account, so it can activate the matching subscription plan.
+// Fire-and-forget — a webhook failure should never break the transfer
+// itself, so this is wrapped and only logged on error.
+async function notifyVpnWebhook(tx) {
+  const webhookUrl = process.env.VPN_WEBHOOK_URL;
+  const webhookSecret = process.env.NNIT_PAY_WEBHOOK_SECRET;
+  const vpnBusinessEmail = process.env.VPN_BUSINESS_EMAIL;
+
+  if (!webhookUrl || !webhookSecret || !vpnBusinessEmail) {
+    return; // Not configured — silently skip, this is optional
+  }
+  if (tx.receiverEmail !== vpnBusinessEmail) {
+    return; // Not a VPN payment — nothing to do
+  }
+
+  try {
+    await fetch(webhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Webhook-Secret": webhookSecret,
+      },
+      body: JSON.stringify({
+        senderEmail: tx.senderEmail,
+        amountInEUR: tx.amountInEUR,
+        transactionId: tx.id,
+      }),
+    });
+  } catch (err) {
+    console.error("Failed to notify VPN webhook:", err.message);
+  }
+}
+
 // POST /transfer - Send money
-router.post("/", authenticate, (req, res) => {
+router.post("/", authenticate, async (req, res) => {
   try {
     const { receiverEmail, amount, currency, note } = req.body;
     if (!receiverEmail || !amount || !currency)
@@ -31,9 +65,8 @@ router.post("/", authenticate, (req, res) => {
     const senderWallet = db.wallets.find(w => w.userId === sender.id);
     const receiverWallet = db.wallets.find(w => w.userId === receiver.id);
 
-    // Convert amount to EUR for processing
     const amountInEUR = convert(parseFloat(amount), currency, "EUR");
-    const fee = parseFloat((amountInEUR * 0.015).toFixed(2)); // 1.5% transfer fee
+    const fee = parseFloat((amountInEUR * 0.015).toFixed(2));
     const totalDeducted = parseFloat((amountInEUR + fee).toFixed(2));
 
     if (senderWallet.balance < totalDeducted)
@@ -41,7 +74,6 @@ router.post("/", authenticate, (req, res) => {
         error: `Insufficient funds. You need €${totalDeducted} (including €${fee} fee) but have €${senderWallet.balance}`
       });
 
-    // Execute transfer
     senderWallet.balance = parseFloat((senderWallet.balance - totalDeducted).toFixed(2));
     receiverWallet.balance = parseFloat((receiverWallet.balance + amountInEUR).toFixed(2));
 
@@ -65,6 +97,10 @@ router.post("/", authenticate, (req, res) => {
     };
 
     db.transactions.push(tx);
+
+    // Fire the webhook after the transfer succeeds — doesn't block the response
+    notifyVpnWebhook(tx);
+
     res.json({ message: "Transfer successful", transaction: tx });
   } catch (err) {
     res.status(500).json({ error: err.message });
