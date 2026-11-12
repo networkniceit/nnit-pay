@@ -50,6 +50,17 @@ router.get("/me", authenticate, (req, res) => {
 router.post("/forgot-password", (req, res) => {
   res.status(501).json({ error: "Password reset by email is not set up yet. Please contact NNIT support." });
 });
+// Owner-only password reset. Works only when PAY_RESET_KEY is set on the server and sent in the x-reset-key header.
+router.post("/owner-reset", (req, res) => {
+  const key = process.env.PAY_RESET_KEY;
+  if (!key || req.headers["x-reset-key"] !== key) return res.status(403).json({ error: "Not allowed" });
+  const { email, newPassword } = req.body;
+  if (!email || typeof newPassword !== "string" || newPassword.length < 8) return res.status(400).json({ error: "Email and a new password of at least 8 characters required" });
+  const user = db.users.find(u => u.email === email);
+  if (!user) return res.status(404).json({ error: "No account found with that email" });
+  user.password = bcrypt.hashSync(newPassword, 10);
+  res.json({ message: "Password changed. You can sign in now." });
+});
 export default router;
 
 
