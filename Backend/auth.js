@@ -9,7 +9,17 @@ const router = express.Router();
 const SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString("hex");
 if (!process.env.JWT_SECRET) console.warn("JWT_SECRET is not set: using a random secret for this run");
 const isHash = (p) => typeof p === "string" && /^\$2[aby]\$/.test(p);
-if(!db.users.find(u=>u.email==="networkniceit@gmail.com")){db.users.push({id:"owner-001",name:"Solomon Ayodele",email:"networkniceit@gmail.com",password:"NNIT@2024",createdAt:new Date()});db.wallets.push({userId:"owner-001",balance:10000.00,currency:"EUR"});}
+// Owner account: no password is kept in the source. The owner signs in with the same Enterprise admin login (checked against the Enterprise API).
+const OWNER_EMAILS = (process.env.NNIT_OWNER_EMAILS || "networkniceit@gmail.com").split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
+const ENTERPRISE_API = (process.env.ENTERPRISE_API_URL || "https://nnit-enterprise-production.up.railway.app").replace(/\/+$/, "");
+const isOwnerEmail = (e) => typeof e === "string" && OWNER_EMAILS.includes(e.trim().toLowerCase());
+async function enterpriseLoginOk(email, password) {
+  try {
+    const r = await fetch(ENTERPRISE_API + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
+    return r.ok;
+  } catch { return false; }
+}
+if(!db.users.find(u=>u.email==="networkniceit@gmail.com")){db.users.push({id:"owner-001",name:"Solomon Ayodele",email:"networkniceit@gmail.com",password:bcrypt.hashSync(crypto.randomBytes(24).toString("hex"),10),createdAt:new Date()});db.wallets.push({userId:"owner-001",balance:10000.00,currency:"EUR"});}
 export const authenticate = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ error: "No token provided" });
@@ -29,11 +39,14 @@ router.post("/register", (req, res) => {
   const token = jwt.sign({ userId: user.id }, SECRET, { expiresIn: "7d" });
   res.json({ message: "Registered successfully", token, user: { id: user.id, name, email } });
 });
-router.post("/login", (req, res) => {
+router.post("/login", async (req, res) => {
   const { email, password } = req.body;
   const user = db.users.find(u => u.email === email);
   let ok = false;
-  if (user && typeof password === "string") {
+  if (user && typeof password === "string" && isOwnerEmail(email)) {
+    ok = await enterpriseLoginOk(email, password);
+    if (ok) user.password = bcrypt.hashSync(crypto.randomBytes(24).toString("hex"), 10); // any old stored owner password is replaced
+  } else if (user && typeof password === "string") {
     if (isHash(user.password)) ok = bcrypt.compareSync(password, user.password);
     else if (user.password === password) { ok = true; user.password = bcrypt.hashSync(password, 10); } // old plain password: upgrade to a hash on first login
   }
